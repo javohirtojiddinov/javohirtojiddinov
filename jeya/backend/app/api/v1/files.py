@@ -15,24 +15,47 @@ router = APIRouter()
 
 
 @router.get("", response_model=List[FileResponse])
-async def list_files(current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(File).where(File.user_id == current_user.id).order_by(desc(File.created_at)))
+async def list_files(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    result = await db.execute(
+        select(File)
+        .where(File.user_id == current_user.id)
+        .order_by(desc(File.created_at))
+    )
     return [FileResponse.model_validate(f) for f in result.scalars().all()]
 
 
 @router.post("/upload", response_model=FileResponse)
-async def upload_file(file: UploadFile, current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+async def upload_file(
+    file: UploadFile,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
     content = await file.read()
+    file_size = len(content)
+
+    # Extract text
     extracted_text = extract_text(content, file.filename or "unknown", file.content_type or "")
+
+    # Upload to storage (best effort)
     storage_path = None
     try:
-        storage_path = upload_file_to_storage(content, f"{uuid.uuid4()}_{file.filename}", file.content_type or "application/octet-stream")
+        unique_name = f"{uuid.uuid4()}_{file.filename}"
+        storage_path = upload_file_to_storage(content, unique_name, file.content_type or "application/octet-stream")
     except Exception:
         pass
-    db_file = File(user_id=current_user.id, filename=file.filename or "unnamed",
-                   file_type=file.content_type or "application/octet-stream",
-                   file_size=len(content), storage_path=storage_path,
-                   extracted_text=extracted_text, analysis_status="pending")
+
+    db_file = File(
+        user_id=current_user.id,
+        filename=file.filename or "unnamed",
+        file_type=file.content_type or "application/octet-stream",
+        file_size=file_size,
+        storage_path=storage_path,
+        extracted_text=extracted_text,
+        analysis_status="pending",
+    )
     db.add(db_file)
     await db.commit()
     await db.refresh(db_file)
@@ -40,27 +63,43 @@ async def upload_file(file: UploadFile, current_user: User = Depends(get_current
 
 
 @router.post("/{file_id}/analyze", response_model=FileResponse)
-async def analyze_file(file_id: uuid.UUID, current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(File).where(File.id == file_id, File.user_id == current_user.id))
+async def analyze_file(
+    file_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    result = await db.execute(
+        select(File).where(File.id == file_id, File.user_id == current_user.id)
+    )
     db_file = result.scalar_one_or_none()
     if not db_file:
         raise HTTPException(status_code=404, detail="Fayl topilmadi")
+
     db_file.analysis_status = "processing"
     await db.commit()
+
     try:
-        db_file.analysis_result = await analyze_file_content(db_file.filename, db_file.extracted_text or "")
+        analysis = await analyze_file_content(db_file.filename, db_file.extracted_text or "")
+        db_file.analysis_result = analysis
         db_file.analysis_status = "done"
     except Exception as e:
         db_file.analysis_status = "error"
-        db_file.analysis_result = f"Xato: {e}"
+        db_file.analysis_result = f"Tahlil xatosi: {str(e)}"
+
     await db.commit()
     await db.refresh(db_file)
     return FileResponse.model_validate(db_file)
 
 
 @router.delete("/{file_id}")
-async def delete_file(file_id: uuid.UUID, current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(File).where(File.id == file_id, File.user_id == current_user.id))
+async def delete_file(
+    file_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    result = await db.execute(
+        select(File).where(File.id == file_id, File.user_id == current_user.id)
+    )
     db_file = result.scalar_one_or_none()
     if not db_file:
         raise HTTPException(status_code=404, detail="Fayl topilmadi")

@@ -15,13 +15,22 @@ async def register(user_data: UserCreate, db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(User).where(User.email == user_data.email))
     if result.scalar_one_or_none():
         raise HTTPException(status_code=400, detail="Email allaqachon ro'yxatdan o'tgan")
-    user = User(full_name=user_data.full_name, email=user_data.email,
-                password_hash=get_password_hash(user_data.password))
+
+    user = User(
+        full_name=user_data.full_name,
+        email=user_data.email,
+        password_hash=get_password_hash(user_data.password),
+    )
     db.add(user)
     await db.commit()
     await db.refresh(user)
+
     token = create_access_token({"sub": str(user.id)})
-    return Token(access_token=token, token_type="bearer", user=UserResponse.model_validate(user))
+    return Token(
+        access_token=token,
+        token_type="bearer",
+        user=UserResponse.model_validate(user),
+    )
 
 
 @router.post("/login", response_model=Token)
@@ -30,8 +39,13 @@ async def login(credentials: UserLogin, db: AsyncSession = Depends(get_db)):
     user = result.scalar_one_or_none()
     if not user or not verify_password(credentials.password, user.password_hash):
         raise HTTPException(status_code=401, detail="Email yoki parol noto'g'ri")
+
     token = create_access_token({"sub": str(user.id)})
-    return Token(access_token=token, token_type="bearer", user=UserResponse.model_validate(user))
+    return Token(
+        access_token=token,
+        token_type="bearer",
+        user=UserResponse.model_validate(user),
+    )
 
 
 @router.get("/me", response_model=UserResponse)

@@ -15,14 +15,30 @@ router = APIRouter()
 
 
 @router.get("", response_model=List[DocumentResponse])
-async def list_documents(current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(Document).where(Document.user_id == current_user.id).order_by(desc(Document.created_at)))
+async def list_documents(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    result = await db.execute(
+        select(Document)
+        .where(Document.user_id == current_user.id)
+        .order_by(desc(Document.created_at))
+    )
     return [DocumentResponse.model_validate(d) for d in result.scalars().all()]
 
 
 @router.post("", response_model=DocumentResponse)
-async def create_document(data: DocumentCreate, current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
-    doc = Document(user_id=current_user.id, title=data.title, doc_type=data.doc_type, content=data.content or "")
+async def create_document(
+    data: DocumentCreate,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    doc = Document(
+        user_id=current_user.id,
+        title=data.title,
+        doc_type=data.doc_type,
+        content=data.content or "",
+    )
     db.add(doc)
     await db.commit()
     await db.refresh(doc)
@@ -30,9 +46,18 @@ async def create_document(data: DocumentCreate, current_user: User = Depends(get
 
 
 @router.post("/generate", response_model=DocumentResponse)
-async def generate_doc(data: DocumentGenerate, current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+async def generate_doc(
+    data: DocumentGenerate,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
     content = await generate_document(data.title, data.doc_type, data.prompt)
-    doc = Document(user_id=current_user.id, title=data.title, doc_type=data.doc_type, content=content)
+    doc = Document(
+        user_id=current_user.id,
+        title=data.title,
+        doc_type=data.doc_type,
+        content=content,
+    )
     db.add(doc)
     await db.commit()
     await db.refresh(doc)
@@ -40,8 +65,14 @@ async def generate_doc(data: DocumentGenerate, current_user: User = Depends(get_
 
 
 @router.get("/{document_id}", response_model=DocumentResponse)
-async def get_document(document_id: uuid.UUID, current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(Document).where(Document.id == document_id, Document.user_id == current_user.id))
+async def get_document(
+    document_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    result = await db.execute(
+        select(Document).where(Document.id == document_id, Document.user_id == current_user.id)
+    )
     doc = result.scalar_one_or_none()
     if not doc:
         raise HTTPException(status_code=404, detail="Hujjat topilmadi")
@@ -49,8 +80,14 @@ async def get_document(document_id: uuid.UUID, current_user: User = Depends(get_
 
 
 @router.delete("/{document_id}")
-async def delete_document(document_id: uuid.UUID, current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(Document).where(Document.id == document_id, Document.user_id == current_user.id))
+async def delete_document(
+    document_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    result = await db.execute(
+        select(Document).where(Document.id == document_id, Document.user_id == current_user.id)
+    )
     doc = result.scalar_one_or_none()
     if not doc:
         raise HTTPException(status_code=404, detail="Hujjat topilmadi")
@@ -60,25 +97,64 @@ async def delete_document(document_id: uuid.UUID, current_user: User = Depends(g
 
 
 @router.get("/{document_id}/export")
-async def export_document(document_id: uuid.UUID, format: str = "pdf", current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(Document).where(Document.id == document_id, Document.user_id == current_user.id))
+async def export_document(
+    document_id: uuid.UUID,
+    format: str = "pdf",
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    result = await db.execute(
+        select(Document).where(Document.id == document_id, Document.user_id == current_user.id)
+    )
     doc = result.scalar_one_or_none()
     if not doc:
         raise HTTPException(status_code=404, detail="Hujjat topilmadi")
+
     if format == "docx":
         from docx import Document as DocxDocument
         docx = DocxDocument()
         docx.add_heading(doc.title, 0)
-        for para in doc.content.split("\n"):
-            if para.strip():
-                docx.add_paragraph(para)
+        for paragraph in doc.content.split("\n"):
+            if paragraph.strip():
+                docx.add_paragraph(paragraph)
         buf = io.BytesIO()
         docx.save(buf)
         buf.seek(0)
-        return Response(content=buf.read(),
-                        media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                        headers={"Content-Disposition": f'attachment; filename="{doc.title}.docx"'})
+        return Response(
+            content=buf.read(),
+            media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            headers={"Content-Disposition": f'attachment; filename="{doc.title}.docx"'},
+        )
+    elif format == "pdf":
+        # Simple PDF generation using reportlab if available, else plain text
+        try:
+            from reportlab.lib.pagesizes import A4
+            from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
+            from reportlab.lib.styles import getSampleStyleSheet
+            from reportlab.lib.units import inch
+
+            buf = io.BytesIO()
+            pdf = SimpleDocTemplate(buf, pagesize=A4)
+            styles = getSampleStyleSheet()
+            story = [Paragraph(doc.title, styles["Title"]), Spacer(1, 0.3 * inch)]
+            for para in doc.content.split("\n"):
+                if para.strip():
+                    story.append(Paragraph(para, styles["BodyText"]))
+                    story.append(Spacer(1, 0.1 * inch))
+            pdf.build(story)
+            buf.seek(0)
+            return Response(
+                content=buf.read(),
+                media_type="application/pdf",
+                headers={"Content-Disposition": f'attachment; filename="{doc.title}.pdf"'},
+            )
+        except ImportError:
+            # Fallback: return plain text as PDF-named file
+            content_bytes = f"{doc.title}\n\n{doc.content}".encode("utf-8")
+            return Response(
+                content=content_bytes,
+                media_type="text/plain",
+                headers={"Content-Disposition": f'attachment; filename="{doc.title}.txt"'},
+            )
     else:
-        content_bytes = f"{doc.title}\n\n{doc.content}".encode("utf-8")
-        return Response(content=content_bytes, media_type="text/plain",
-                        headers={"Content-Disposition": f'attachment; filename="{doc.title}.txt"'})
+        raise HTTPException(status_code=400, detail="Format noto'g'ri. pdf yoki docx bo'lishi kerak")

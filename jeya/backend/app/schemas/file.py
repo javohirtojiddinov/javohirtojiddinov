@@ -12,4 +12,5 @@ class FileResponse(BaseModel):
     analysis_status: str
     analysis_result: Optional[str] = None
     created_at: datetime
+
     model_config = {"from_attributes": True}
