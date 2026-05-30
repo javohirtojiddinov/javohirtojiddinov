@@ -1,222 +1,327 @@
 'use client'
 
+import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import { useState } from 'react'
-import {
-  Mic, PenLine, MessageCircle, Globe2, ClipboardList,
-  Zap, ChevronRight, AudioLines, Languages,
-} from 'lucide-react'
-import JeyaGlobe from '@/components/landing/JeyaGlobe'
+import { Mic, MicOff, Send, ChevronRight, Activity, Cpu, Wifi, Clock } from 'lucide-react'
 import { useAuthStore } from '@/store/authStore'
-import { DEMO_MODE, DEMO_USER, DEMO_TOKEN } from '@/lib/demo'
+import { DEMO_MODE, DEMO_USER, DEMO_TOKEN, demoReply } from '@/lib/demo'
 
-const FEATURES = [
-  { icon: PenLine, title: 'Matn yaratish', desc: 'Ijodiy va samarali' },
-  { icon: MessageCircle, title: 'Savollarga javob', desc: 'Aniq va tezkor' },
-  { icon: Globe2, title: 'Tarjima qilish', desc: "Ko'p tilni qo'llab-quvvatlash" },
-  { icon: ClipboardList, title: 'Reja tuzish', desc: 'Avtomatik rejalashtirish' },
+const GREET = [
+  "Assalomu alaykum. Men JEYA — sizning shaxsiy AI operatoringizman.",
+  "Bugun sizga qanday yordam bera olaman?",
 ]
 
-const QUICK_COMMANDS = [
+const SUGGESTIONS = [
   "Bugun ob-havo qanday?",
-  "Menga iqtibos haqida tushuntir",
-  "5 haftalik o'quv reja tuzib ber",
-  "Ushbu matnni tarjima qil",
-  "Ijodiy g'oya taklif qil",
+  "5 haftalik o'quv rejasi tuzib ber",
+  "Menga motivatsion iqtibos ayt",
+  "Inglizchadan tarjima qil",
 ]
 
-const STATUS = [
-  { label: 'AI yadro', value: 'Optimal' },
-  { label: 'Tezkor javob', value: '0.8 soniya' },
-  { label: 'Aniqlik darajasi', value: '97.7%' },
-  { label: 'Foydalanuvchilar', value: '12.4K+' },
-]
+function useTime() {
+  const [t, setT] = useState('')
+  useEffect(() => {
+    const tick = () => {
+      const d = new Date()
+      setT(d.toLocaleTimeString('uz-UZ', { hour: '2-digit', minute: '2-digit', second: '2-digit' }))
+    }
+    tick()
+    const id = setInterval(tick, 1000)
+    return () => clearInterval(id)
+  }, [])
+  return t
+}
 
-export default function HomePage() {
+interface Msg { role: 'user' | 'ai'; text: string }
+
+export default function JarvisPage() {
   const router = useRouter()
   const { isAuthenticated, login } = useAuthStore()
-  const [text, setText] = useState('')
+  const time = useTime()
+  const [input, setInput] = useState('')
+  const [msgs, setMsgs] = useState<Msg[]>([])
+  const [loading, setLoading] = useState(false)
+  const [listening, setListening] = useState(false)
+  const [booted, setBooted] = useState(false)
+  const [bootText, setBootText] = useState('')
+  const [activePanel, setActivePanel] = useState<'chat'|'docs'|'memory'|'system'>('chat')
+  const endRef = useRef<HTMLDivElement>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
 
-  // Foydalanuvchini chat sahifasiga yo'naltirish (demo rejimida avto-kirish)
-  const go = (prompt?: string) => {
-    const q = (prompt ?? text).trim()
-    if (DEMO_MODE && !isAuthenticated) {
-      login(DEMO_TOKEN, DEMO_USER)
+  // Boot animatsiyasi
+  const BOOT_LINES = [
+    'JEYA OS v2.0 initializing...',
+    'Loading neural modules... OK',
+    'Language model: JEYA-7B... READY',
+    'Voice engine: active',
+    'System status: OPTIMAL',
+    '> Salom. Men tayyor.',
+  ]
+  useEffect(() => {
+    let i = 0
+    const id = setInterval(() => {
+      setBootText(prev => prev + (i > 0 ? '\n' : '') + BOOT_LINES[i])
+      i++
+      if (i >= BOOT_LINES.length) {
+        clearInterval(id)
+        setTimeout(() => setBooted(true), 600)
+      }
+    }, 320)
+    return () => clearInterval(id)
+  }, [])
+
+  useEffect(() => {
+    endRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [msgs, loading])
+
+  const send = async (text: string) => {
+    if (!text.trim() || loading) return
+    if (DEMO_MODE && !isAuthenticated) login(DEMO_TOKEN, DEMO_USER)
+    setInput('')
+    setMsgs(p => [...p, { role: 'user', text }])
+    setLoading(true)
+    const reply = demoReply(text)
+    const words = reply.split(' ')
+    let built = ''
+    setMsgs(p => [...p, { role: 'ai', text: '' }])
+    for (let i = 0; i < words.length; i++) {
+      built += (i === 0 ? '' : ' ') + words[i]
+      const snap = built
+      setMsgs(p => { const c = [...p]; c[c.length-1] = { role:'ai', text: snap }; return c })
+      await new Promise(r => setTimeout(r, 40))
     }
-    router.push(q ? `/dashboard/chat?q=${encodeURIComponent(q)}` : '/dashboard/chat')
+    setLoading(false)
+  }
+
+  if (!booted) {
+    return (
+      <div className="h-screen w-screen bg-black flex items-center justify-center font-mono">
+        <div className="border border-cyan-500/40 rounded p-8 max-w-lg w-full" style={{ boxShadow: '0 0 40px rgba(0,229,255,0.15)' }}>
+          <div className="text-cyan-400 text-xs mb-4 opacity-60">JEYA ARTIFICIAL INTELLIGENCE SYSTEM</div>
+          <pre className="text-cyan-300 text-sm leading-6 whitespace-pre-wrap">{bootText}<span className="animate-pulse">▌</span></pre>
+        </div>
+      </div>
+    )
   }
 
   return (
-    <main className="relative h-screen w-screen overflow-hidden space-bg text-jeya-text">
-      <div className="stars absolute inset-0" />
+    <div className="h-screen w-screen overflow-hidden font-mono select-none" style={{
+      background: 'radial-gradient(ellipse 80% 70% at 50% 50%, rgba(0,40,60,0.95), #000 70%)',
+    }}>
+      {/* scan line */}
+      <div className="pointer-events-none absolute inset-0 z-50"
+        style={{ background: 'repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,229,255,0.015) 2px, rgba(0,229,255,0.015) 4px)' }} />
 
-      {/* ===== Logo (yuqori-chap) ===== */}
-      <div className="absolute top-5 left-5 z-20">
-        <div className="glass-cyan rounded-2xl px-5 py-3 flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-jeya-cyan to-jeya-emerald flex items-center justify-center font-black text-jeya-dark text-lg shadow-[0_0_18px_rgba(0,229,255,0.6)]">
-            J
-          </div>
-          <span className="font-bold text-2xl tracking-wide neon-text-cyan">JEYA</span>
-        </div>
-      </div>
-
-      {/* ===== Markaz: globus + sarlavha ===== */}
-      <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-        <div className="mt-[-40px]">
-          <JeyaGlobe />
-        </div>
-        <h1 className="jeya-title text-7xl md:text-8xl font-black mt-[-70px]">JEYA</h1>
-        <p className="text-lg md:text-xl text-jeya-text/90 mt-3 font-medium">
-          Sizning o&apos;zbek tilidagi aqlli yordamchingiz
-        </p>
-        <p className="text-sm text-jeya-muted mt-1">
-          Kelajak muloqotining cheksiz imkoniyatlari
-        </p>
-      </div>
-
-      {/* ===== Chap-yuqori: JEYA nimani qila oladi? ===== */}
-      <div className="absolute top-28 left-5 z-20 w-72">
-        <div className="glass-cyan rounded-2xl p-4">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-2">
-              <Zap size={16} className="text-jeya-cyan" />
-              <span className="font-semibold text-sm">JEYA nimani qila oladi?</span>
+      {/* ───── TOP BAR ───── */}
+      <div className="absolute top-0 left-0 right-0 h-14 flex items-center justify-between px-8 z-40"
+        style={{ borderBottom: '1px solid rgba(0,229,255,0.15)', background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(10px)' }}>
+        <div className="flex items-center gap-4">
+          <div className="relative w-8 h-8">
+            <div className="absolute inset-0 rounded-full border-2 border-cyan-400 animate-spin" style={{ animationDuration:'3s', borderTopColor:'transparent' }} />
+            <div className="absolute inset-1 rounded-full bg-cyan-400/20 flex items-center justify-center">
+              <span className="text-cyan-300 text-[10px] font-bold">J</span>
             </div>
-            <ChevronRight size={14} className="text-jeya-muted" />
           </div>
-          <div className="space-y-3">
-            {FEATURES.map((f) => (
-              <div key={f.title} className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-lg border border-jeya-cyan/30 bg-jeya-cyan/5 flex items-center justify-center">
-                  <f.icon size={16} className="text-jeya-cyan" />
-                </div>
-                <div>
-                  <div className="text-sm font-medium">{f.title}</div>
-                  <div className="text-xs text-jeya-muted">{f.desc}</div>
-                </div>
+          <span className="text-cyan-300 text-lg tracking-[0.3em] font-bold">JEYA</span>
+          <span className="text-cyan-500/50 text-xs">AI OPERATOR v2.0</span>
+        </div>
+        <div className="flex items-center gap-6 text-xs text-cyan-500/70">
+          <span className="flex items-center gap-1"><Activity size={12} className="text-green-400" /> ONLINE</span>
+          <span className="flex items-center gap-1"><Cpu size={12} /> CPU 12%</span>
+          <span className="flex items-center gap-1"><Wifi size={12} /> NET OK</span>
+          <span className="flex items-center gap-1 text-cyan-300"><Clock size={12} /> {time}</span>
+        </div>
+      </div>
+
+      {/* ───── MAIN LAYOUT ───── */}
+      <div className="absolute inset-0 pt-14 pb-0 flex">
+
+        {/* LEFT PANEL */}
+        <div className="w-56 flex flex-col gap-2 p-3 border-r" style={{ borderColor:'rgba(0,229,255,0.12)', background:'rgba(0,10,20,0.7)' }}>
+          <div className="text-cyan-500/50 text-[10px] tracking-widest mb-1 px-2">MODULES</div>
+          {([
+            ['chat','💬','AI Chat'],
+            ['docs','📄','Hujjatlar'],
+            ['memory','🧠','Xotira'],
+            ['system','⚡','Tizim'],
+          ] as const).map(([key, icon, label]) => (
+            <button key={key} onClick={() => setActivePanel(key)}
+              className="flex items-center gap-3 px-3 py-2.5 rounded text-left transition-all"
+              style={{
+                background: activePanel === key ? 'rgba(0,229,255,0.12)' : 'transparent',
+                border: `1px solid ${activePanel === key ? 'rgba(0,229,255,0.4)' : 'rgba(0,229,255,0.08)'}`,
+                color: activePanel === key ? '#00e5ff' : 'rgba(0,229,255,0.5)',
+                boxShadow: activePanel === key ? '0 0 12px rgba(0,229,255,0.15)' : 'none',
+              }}>
+              <span>{icon}</span>
+              <span className="text-xs tracking-wider">{label}</span>
+              {activePanel === key && <ChevronRight size={10} className="ml-auto" />}
+            </button>
+          ))}
+
+          <div className="mt-auto border-t pt-3" style={{ borderColor:'rgba(0,229,255,0.1)' }}>
+            <div className="text-cyan-500/40 text-[10px] tracking-widest mb-2 px-2">STATUS</div>
+            {[['AI YADRO','OPTIMAL','#00ff9d'],['JAVOB','0.8s','#00e5ff'],['ANIQLIK','97.7%','#00ff9d']].map(([l,v,c])=>(
+              <div key={l} className="flex justify-between px-2 py-1 text-[11px]">
+                <span style={{ color:'rgba(0,229,255,0.4)' }}>{l}</span>
+                <span style={{ color: c }}>{v}</span>
               </div>
             ))}
-          </div>
-          <div className="flex items-center gap-2 mt-4 pt-3 border-t border-jeya-border">
-            <span className="w-2 h-2 rounded-full bg-jeya-emerald animate-pulse shadow-[0_0_8px_#00ff9d]" />
-            <span className="text-xs text-jeya-emerald">Faol va tayyor</span>
-          </div>
-        </div>
-      </div>
-
-      {/* ===== Chap-past: til modeli ===== */}
-      <div className="absolute bottom-32 left-5 z-20 w-72">
-        <div className="glass-cyan rounded-2xl p-4 flex items-center justify-between">
-          <div>
-            <div className="text-xs text-jeya-muted mb-1">Hozirgi til modeli</div>
-            <div className="text-2xl font-black neon-text-cyan">JEYA-7B</div>
-            <div className="text-xs text-jeya-muted mt-1">Eng so&apos;nggi avlod</div>
-            <div className="mt-3 h-1 w-32 rounded-full bg-jeya-border overflow-hidden">
-              <div className="h-full w-3/4 bg-gradient-to-r from-jeya-cyan to-jeya-emerald" />
+            <div className="mx-2 mt-2 text-[10px] flex items-center gap-1.5" style={{ color:'#00ff9d' }}>
+              <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
+              Demo rejimi faol
             </div>
           </div>
-          <div className="w-16 h-16 rounded-lg border border-jeya-cyan/20 flex items-center justify-center rotate-45">
-            <div className="w-8 h-8 border border-jeya-emerald/40 animate-pulse-slow" />
-          </div>
         </div>
-      </div>
 
-      {/* ===== O'ng-yuqori: tezkor buyruqlar ===== */}
-      <div className="absolute top-28 right-5 z-20 w-80">
-        <div className="glass-cyan rounded-2xl p-4">
-          <div className="flex items-center gap-2 mb-4">
-            <Zap size={16} className="text-jeya-emerald" />
-            <span className="font-semibold text-sm">Tezkor buyruqlar</span>
-          </div>
-          <div className="space-y-2">
-            {QUICK_COMMANDS.map((c) => (
-              <button
-                key={c}
-                onClick={() => go(c)}
-                className="w-full text-left px-3 py-2.5 rounded-lg border border-jeya-border hover:border-jeya-cyan/50 hover:bg-jeya-cyan/5 transition-all flex items-center justify-between group"
-              >
-                <span className="text-sm text-jeya-text/90">&ldquo;{c}&rdquo;</span>
-                <ChevronRight size={14} className="text-jeya-muted group-hover:text-jeya-cyan" />
+        {/* CENTER — main */}
+        <div className="flex-1 flex flex-col">
+
+          {activePanel === 'chat' && (
+            <>
+              {/* messages */}
+              <div className="flex-1 overflow-y-auto p-6 space-y-4">
+                {msgs.length === 0 && (
+                  <div className="flex flex-col items-center justify-center h-full gap-8">
+                    {/* Jarvis ring */}
+                    <div className="relative w-44 h-44 flex items-center justify-center">
+                      <div className="absolute inset-0 rounded-full border border-cyan-400/20 animate-spin" style={{ animationDuration:'12s' }} />
+                      <div className="absolute inset-3 rounded-full border border-cyan-400/30 animate-spin" style={{ animationDuration:'8s', animationDirection:'reverse' }} />
+                      <div className="absolute inset-6 rounded-full border-2 border-cyan-400/50 animate-spin" style={{ animationDuration:'5s' }} />
+                      <div className="absolute inset-10 rounded-full" style={{ background:'radial-gradient(circle, rgba(0,229,255,0.3), transparent)', animation:'pulse 2s ease-in-out infinite' }} />
+                      <span className="text-cyan-300 text-3xl font-bold tracking-widest" style={{ textShadow:'0 0 20px #00e5ff' }}>J</span>
+                    </div>
+                    <div className="text-center space-y-2">
+                      {GREET.map((g,i) => (
+                        <p key={i} className="text-cyan-300/80 text-sm" style={{ textShadow:'0 0 10px rgba(0,229,255,0.3)' }}>{g}</p>
+                      ))}
+                    </div>
+                    <div className="grid grid-cols-2 gap-2 w-full max-w-lg">
+                      {SUGGESTIONS.map(s => (
+                        <button key={s} onClick={() => send(s)}
+                          className="text-left p-3 rounded text-xs transition-all"
+                          style={{ border:'1px solid rgba(0,229,255,0.2)', color:'rgba(0,229,255,0.7)', background:'rgba(0,229,255,0.04)' }}
+                          onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor='rgba(0,229,255,0.5)'; (e.currentTarget as HTMLElement).style.background='rgba(0,229,255,0.1)' }}
+                          onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor='rgba(0,229,255,0.2)'; (e.currentTarget as HTMLElement).style.background='rgba(0,229,255,0.04)' }}>
+                          <span style={{ color:'rgba(0,229,255,0.4)' }}>› </span>{s}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {msgs.map((m, i) => (
+                  <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                    {m.role === 'ai' && (
+                      <div className="w-6 h-6 rounded-full border border-cyan-400/50 flex items-center justify-center mr-2 mt-1 flex-shrink-0" style={{ boxShadow:'0 0 8px rgba(0,229,255,0.3)' }}>
+                        <span className="text-cyan-300 text-[9px] font-bold">J</span>
+                      </div>
+                    )}
+                    <div className="max-w-xl rounded px-4 py-3 text-sm leading-relaxed"
+                      style={m.role === 'user'
+                        ? { background:'rgba(0,229,255,0.1)', border:'1px solid rgba(0,229,255,0.3)', color:'#e0f7ff' }
+                        : { background:'rgba(0,255,157,0.05)', border:'1px solid rgba(0,255,157,0.2)', color:'rgba(0,255,157,0.9)' }
+                      }>
+                      {m.role === 'ai' && <span className="text-cyan-400/50 text-[10px] block mb-1">JEYA ›</span>}
+                      {m.text}
+                    </div>
+                  </div>
+                ))}
+
+                {loading && (
+                  <div className="flex items-center gap-2 ml-8">
+                    <span className="text-cyan-400/50 text-[10px]">JEYA processing</span>
+                    {[0,1,2].map(i => (
+                      <span key={i} className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-bounce" style={{ animationDelay:`${i*0.15}s` }} />
+                    ))}
+                  </div>
+                )}
+                <div ref={endRef} />
+              </div>
+
+              {/* Input */}
+              <div className="p-4 border-t" style={{ borderColor:'rgba(0,229,255,0.15)', background:'rgba(0,0,0,0.5)' }}>
+                <div className="flex items-center gap-3 rounded px-4 py-3"
+                  style={{ border:'1px solid rgba(0,229,255,0.3)', background:'rgba(0,229,255,0.04)', boxShadow:'0 0 20px rgba(0,229,255,0.08)' }}>
+                  <span className="text-cyan-500/60 text-xs">›</span>
+                  <input ref={inputRef} value={input}
+                    onChange={e => setInput(e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && send(input)}
+                    placeholder="Buyruq yoki savol kiriting..."
+                    className="flex-1 bg-transparent outline-none text-sm"
+                    style={{ color:'rgba(0,229,255,0.9)', caretColor:'#00e5ff' }}
+                    placeholder-class="text-cyan-500/40"
+                    autoFocus
+                  />
+                  <button onClick={() => setListening(l => !l)}
+                    className="w-8 h-8 rounded-full flex items-center justify-center transition-all"
+                    style={{ border:`1px solid ${listening ? '#00ff9d' : 'rgba(0,229,255,0.3)'}`, background: listening ? 'rgba(0,255,157,0.15)' : 'transparent' }}>
+                    {listening ? <MicOff size={14} style={{ color:'#00ff9d' }} /> : <Mic size={14} style={{ color:'rgba(0,229,255,0.6)' }} />}
+                  </button>
+                  <button onClick={() => send(input)}
+                    className="w-8 h-8 rounded-full flex items-center justify-center transition-all"
+                    style={{ border:'1px solid rgba(0,229,255,0.4)', background:'rgba(0,229,255,0.1)' }}>
+                    <Send size={13} style={{ color:'#00e5ff' }} />
+                  </button>
+                </div>
+                <div className="text-center mt-2 text-[10px]" style={{ color:'rgba(0,229,255,0.25)' }}>
+                  Enter — yuborish &nbsp;·&nbsp; Demo rejimi yoqilgan
+                </div>
+              </div>
+            </>
+          )}
+
+          {activePanel !== 'chat' && (
+            <div className="flex-1 flex items-center justify-center flex-col gap-4">
+              <div className="relative w-32 h-32">
+                <div className="absolute inset-0 rounded-full border border-cyan-400/20 animate-spin" style={{ animationDuration:'8s' }} />
+                <div className="absolute inset-4 rounded-full border border-cyan-400/30 animate-spin" style={{ animationDuration:'5s', animationDirection:'reverse' }} />
+                <div className="absolute inset-8 rounded-full" style={{ background:'radial-gradient(circle, rgba(0,229,255,0.25), transparent)' }} />
+              </div>
+              <div className="text-cyan-400/60 text-sm tracking-widest">
+                {activePanel === 'docs' && '[ HUJJATLAR MODULI ]'}
+                {activePanel === 'memory' && '[ XOTIRA MODULI ]'}
+                {activePanel === 'system' && '[ TIZIM MODULI ]'}
+              </div>
+              <div className="text-cyan-500/40 text-xs">Backend ulanishini kuting...</div>
+              <button onClick={() => setActivePanel('chat')}
+                className="text-xs px-4 py-2 rounded transition-all"
+                style={{ border:'1px solid rgba(0,229,255,0.3)', color:'#00e5ff' }}>
+                ← Chatga qaytish
               </button>
-            ))}
-          </div>
+            </div>
+          )}
         </div>
-      </div>
 
-      {/* ===== O'ng-o'rta: tizim holati ===== */}
-      <div className="absolute bottom-44 right-5 z-20 w-80">
-        <div className="glass-cyan rounded-2xl p-4">
-          <div className="flex items-center gap-2 mb-3">
-            <AudioLines size={16} className="text-jeya-cyan" />
-            <span className="font-semibold text-sm">Tizim holati</span>
-          </div>
-          <div className="space-y-2">
-            {STATUS.map((s) => (
-              <div key={s.label} className="flex items-center justify-between text-sm">
-                <span className="text-jeya-muted">{s.label}:</span>
-                <span className="text-jeya-emerald font-medium">{s.value}</span>
+        {/* RIGHT PANEL */}
+        <div className="w-52 p-3 border-l flex flex-col gap-3" style={{ borderColor:'rgba(0,229,255,0.12)', background:'rgba(0,10,20,0.7)' }}>
+          <div className="text-cyan-500/50 text-[10px] tracking-widest px-2">QUICK ACCESS</div>
+          {SUGGESTIONS.map(s => (
+            <button key={s} onClick={() => { setActivePanel('chat'); send(s) }}
+              className="text-left p-2.5 rounded text-[11px] leading-relaxed transition-all"
+              style={{ border:'1px solid rgba(0,229,255,0.12)', color:'rgba(0,229,255,0.6)', background:'transparent' }}
+              onMouseEnter={e => { const el = e.currentTarget as HTMLElement; el.style.borderColor='rgba(0,229,255,0.4)'; el.style.color='#00e5ff' }}
+              onMouseLeave={e => { const el = e.currentTarget as HTMLElement; el.style.borderColor='rgba(0,229,255,0.12)'; el.style.color='rgba(0,229,255,0.6)' }}>
+              <span style={{ color:'rgba(0,229,255,0.3)' }}>›› </span>{s}
+            </button>
+          ))}
+
+          <div className="mt-auto">
+            <div className="text-cyan-500/40 text-[10px] tracking-widest mb-2 px-2">NEURAL LOAD</div>
+            {[72, 45, 88, 31].map((v, i) => (
+              <div key={i} className="px-2 mb-2">
+                <div className="flex justify-between text-[10px] mb-1" style={{ color:'rgba(0,229,255,0.4)' }}>
+                  <span>{['NLP','MEM','PROC','NET'][i]}</span>
+                  <span style={{ color:'#00ff9d' }}>{v}%</span>
+                </div>
+                <div className="h-0.5 rounded-full" style={{ background:'rgba(0,229,255,0.1)' }}>
+                  <div className="h-full rounded-full" style={{ width:`${v}%`, background:'linear-gradient(90deg,#00e5ff,#00ff9d)', boxShadow:'0 0 6px rgba(0,229,255,0.4)' }} />
+                </div>
               </div>
             ))}
           </div>
         </div>
       </div>
-
-      {/* ===== O'ng-past: 24/7 ===== */}
-      <div className="absolute bottom-32 right-5 z-20 w-80">
-        <div className="glass-cyan rounded-2xl p-3 flex items-center gap-3">
-          <div className="w-9 h-9 rounded-lg border border-jeya-emerald/30 bg-jeya-emerald/5 flex items-center justify-center">
-            <MessageCircle size={16} className="text-jeya-emerald" />
-          </div>
-          <div className="flex-1">
-            <div className="text-sm font-medium">24/7 faol</div>
-            <div className="text-xs text-jeya-muted">Doim siz bilan</div>
-          </div>
-          <span className="w-2 h-2 rounded-full bg-jeya-emerald animate-pulse shadow-[0_0_8px_#00ff9d]" />
-        </div>
-      </div>
-
-      {/* ===== Past: ovozli kirish paneli ===== */}
-      <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-30 w-[640px] max-w-[90vw]">
-        <div className="glass-cyan rounded-full p-2 pl-4 flex items-center gap-3 shadow-[0_0_40px_rgba(0,229,255,0.15)]">
-          <button
-            onClick={() => go()}
-            className="w-9 h-9 rounded-lg border border-jeya-border flex items-center justify-center hover:border-jeya-cyan/50 transition-colors"
-            title="Tarjima"
-          >
-            <Languages size={16} className="text-jeya-muted" />
-          </button>
-
-          {/* chap to'lqin */}
-          <div className="flex items-center gap-0.5 h-6">
-            {[...Array(9)].map((_, i) => (
-              <span key={i} className="wave-bar h-full" style={{ animationDelay: `${i * 0.08}s` }} />
-            ))}
-          </div>
-
-          <input
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && go()}
-            placeholder="Gapirishni boshlang"
-            className="flex-1 bg-transparent text-center text-jeya-text placeholder-jeya-muted outline-none text-base"
-          />
-
-          {/* o'ng to'lqin */}
-          <div className="flex items-center gap-0.5 h-6">
-            {[...Array(9)].map((_, i) => (
-              <span key={i} className="wave-bar h-full" style={{ animationDelay: `${i * 0.08}s` }} />
-            ))}
-          </div>
-
-          <button
-            onClick={() => go()}
-            className="w-12 h-12 rounded-full bg-gradient-to-br from-jeya-cyan to-jeya-emerald flex items-center justify-center shadow-[0_0_24px_rgba(0,229,255,0.5)] hover:scale-105 transition-transform"
-            title="Gapirish"
-          >
-            <Mic size={20} className="text-jeya-dark" />
-          </button>
-        </div>
-      </div>
-    </main>
+    </div>
   )
 }
