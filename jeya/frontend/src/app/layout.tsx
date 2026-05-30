@@ -1,24 +1,23 @@
 import type { Metadata } from 'next'
+import { Inter } from 'next/font/google'
 import './globals.css'
-import { Providers } from './providers'
+import { Toaster } from 'react-hot-toast'
+
+const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
-  title: "JEYA — O'zbek AI Yordamchisi",
-  description: "O'zbek tilida ovozli va matnli AI yordamchi platformasi",
+  title: "JEYA AI — Aqlli Raqamli Operator",
+  description: "Windows 11 va web uchun yaratilgan aqlli AI operator va shaxsiy yordamchi",
 }
 
-// Sahifalarni request vaqtida render qilish (statik prerender o'rniga)
-export const dynamic = 'force-dynamic'
-
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode
-}) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="uz">
-      <body className="font-sans bg-jeya-dark text-jeya-text min-h-screen">
-        <Providers>{children}</Providers>
+      <body className={`${inter.className} bg-jeya-dark text-jeya-text min-h-screen`}>
+        {children}
+        <Toaster position="top-right" toastOptions={{
+          style: { background: '#080f18', color: '#e2f4ff', border: '1px solid #00f5ff33' }
+        }} />
       </body>
     </html>
   )

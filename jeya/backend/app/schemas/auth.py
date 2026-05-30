@@ -1,7 +1,6 @@
 from pydantic import BaseModel, EmailStr
 from datetime import datetime
 from uuid import UUID
-from typing import Optional
 
 
 class UserCreate(BaseModel):
@@ -22,7 +21,6 @@ class UserResponse(BaseModel):
     language: str
     is_active: bool
     created_at: datetime
-
     model_config = {"from_attributes": True}
 
 
