@@ -1,201 +1,99 @@
 'use client'
-
 import { useEffect, useState, useRef } from 'react'
 import { apiClient } from '@/lib/api'
-import { Upload, FileText, Image, Trash2, Loader, Search, AlertCircle, CheckCircle } from 'lucide-react'
+import { Upload, FileText, Trash2, Loader, Search, CheckCircle, AlertCircle } from 'lucide-react'
 import toast from 'react-hot-toast'
 import Card from '@/components/ui/Card'
 
-interface File {
-  id: string
-  filename: string
-  file_type: string
-  file_size: number
-  analysis_status: 'pending' | 'processing' | 'done' | 'error'
-  analysis_result?: string
-  created_at: string
-}
-
-const getFileIcon = (type: string) => {
-  if (type.includes('pdf')) return FileText
-  if (type.includes('image')) return Image
-  return FileText
-}
-
-const formatSize = (bytes: number) => {
-  if (bytes < 1024) return `${bytes} B`
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
-}
+interface FileItem { id: string; filename: string; file_type: string; file_size: number; analysis_status: string; analysis_result?: string; created_at: string }
 
 export default function FilesPage() {
-  const [files, setFiles] = useState<File[]>([])
+  const [files, setFiles] = useState<FileItem[]>([])
   const [loading, setLoading] = useState(true)
   const [uploading, setUploading] = useState(false)
   const [dragging, setDragging] = useState(false)
   const [analyzing, setAnalyzing] = useState<string | null>(null)
-  const fileInputRef = useRef<HTMLInputElement>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
 
-  const fetchFiles = async () => {
-    try {
-      const res = await apiClient.get('/files')
-      setFiles(res.data)
-    } catch (e) {
-      toast.error("Fayllarni yuklashda xato")
-    } finally {
-      setLoading(false)
-    }
-  }
+  useEffect(() => {
+    apiClient.get('/files').then((r) => setFiles(r.data)).catch(() => toast.error('Yuklash xatosi')).finally(() => setLoading(false))
+  }, [])
 
-  useEffect(() => { fetchFiles() }, [])
-
-  const handleUpload = async (fileList: FileList) => {
-    const file = fileList[0]
-    if (!file) return
+  const upload = async (fl: FileList) => {
+    const f = fl[0]; if (!f) return
     setUploading(true)
-    const formData = new FormData()
-    formData.append('file', file)
+    const fd = new FormData(); fd.append('file', f)
     try {
-      const res = await apiClient.post('/files/upload', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      })
-      setFiles((prev) => [res.data, ...prev])
-      toast.success("Fayl yuklandi!")
-    } catch (e) {
-      toast.error("Fayl yuklashda xato")
-    } finally {
-      setUploading(false)
-    }
+      const r = await apiClient.post('/files/upload', fd, { headers: { 'Content-Type': 'multipart/form-data' } })
+      setFiles((p) => [r.data, ...p]); toast.success('Fayl yuklandi!')
+    } catch { toast.error('Yuklash xatosi') } finally { setUploading(false) }
   }
 
-  const handleAnalyze = async (id: string) => {
+  const analyze = async (id: string) => {
     setAnalyzing(id)
     try {
-      const res = await apiClient.post(`/files/${id}/analyze`)
-      setFiles((prev) => prev.map((f) => f.id === id ? { ...f, ...res.data } : f))
-      toast.success("Fayl tahlil qilindi!")
-    } catch (e) {
-      toast.error("Tahlil qilishda xato")
-    } finally {
-      setAnalyzing(null)
-    }
+      const r = await apiClient.post(`/files/${id}/analyze`)
+      setFiles((p) => p.map((f) => f.id === id ? { ...f, ...r.data } : f))
+      toast.success('Tahlil tugadi!')
+    } catch { toast.error('Tahlil xatosi') } finally { setAnalyzing(null) }
   }
 
-  const handleDelete = async (id: string) => {
-    try {
-      await apiClient.delete(`/files/${id}`)
-      setFiles((prev) => prev.filter((f) => f.id !== id))
-      toast.success("Fayl o'chirildi")
-    } catch (e) {
-      toast.error("O'chirishda xato")
-    }
+  const del = async (id: string) => {
+    await apiClient.delete(`/files/${id}`).catch(() => {})
+    setFiles((p) => p.filter((f) => f.id !== id)); toast.success("O'chirildi")
   }
 
-  const statusBadge = (status: File['analysis_status']) => {
-    const map = {
-      pending: { label: "Tahlil kutilmoqda", color: "text-yellow-400 bg-yellow-500/10", icon: AlertCircle },
-      processing: { label: "Tahlil qilinmoqda", color: "text-blue-400 bg-blue-500/10", icon: Loader },
-      done: { label: "Tahlil tugadi", color: "text-green-400 bg-green-500/10", icon: CheckCircle },
-      error: { label: "Xato yuz berdi", color: "text-red-400 bg-red-500/10", icon: AlertCircle },
-    }
-    const s = map[status]
-    return (
-      <span className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full ${s.color}`}>
-        <s.icon size={10} className={status === 'processing' ? 'animate-spin' : ''} />
-        {s.label}
-      </span>
-    )
-  }
+  const fmt = (b: number) => b < 1024 ? `${b}B` : b < 1048576 ? `${(b/1024).toFixed(1)}KB` : `${(b/1048576).toFixed(1)}MB`
 
   return (
-    <div className="p-8 max-w-6xl">
+    <div className="p-8 max-w-4xl">
       <div className="mb-8">
-        <h1 className="text-2xl font-bold text-jeya-text">Fayllar</h1>
-        <p className="text-jeya-muted text-sm mt-1">Fayllarni yuklang va AI yordamida tahlil qiling</p>
+        <div className="text-xs tracking-[0.3em] text-jeya-cyan mb-1">FAYLLAR</div>
+        <h1 className="text-2xl font-black">Fayl tahlili</h1>
       </div>
 
-      {/* Upload area */}
-      <div
-        onDragOver={(e) => { e.preventDefault(); setDragging(true) }}
-        onDragLeave={() => setDragging(false)}
-        onDrop={(e) => { e.preventDefault(); setDragging(false); handleUpload(e.dataTransfer.files) }}
-        onClick={() => fileInputRef.current?.click()}
-        className={`border-2 border-dashed rounded-2xl p-10 text-center cursor-pointer transition-all duration-300 mb-8 ${
-          dragging ? 'border-jeya-accent bg-jeya-accent/10' : 'border-jeya-border hover:border-jeya-accent/50 hover:bg-jeya-card/50'
-        }`}
-      >
-        <input ref={fileInputRef} type="file" accept=".pdf,.doc,.docx,.txt,.png,.jpg,.jpeg" className="hidden" onChange={(e) => e.target.files && handleUpload(e.target.files)} />
-        {uploading ? (
-          <div className="flex flex-col items-center gap-3">
-            <Loader size={36} className="text-jeya-accent animate-spin" />
-            <p className="text-jeya-muted text-sm">Yuklanmoqda...</p>
-          </div>
-        ) : (
-          <div className="flex flex-col items-center gap-3">
-            <Upload size={36} className="text-jeya-muted" />
-            <div>
-              <p className="text-jeya-text font-medium">Faylni shu yerga torting yoki bosing</p>
-              <p className="text-jeya-muted text-sm mt-1">PDF, Word, TXT, rasm fayllari qo'llab-quvvatlanadi</p>
+      <div onDragOver={(e) => { e.preventDefault(); setDragging(true) }} onDragLeave={() => setDragging(false)}
+        onDrop={(e) => { e.preventDefault(); setDragging(false); upload(e.dataTransfer.files) }}
+        onClick={() => inputRef.current?.click()}
+        className={`border-2 border-dashed rounded-xl p-10 text-center cursor-pointer transition-all mb-8 ${
+          dragging ? 'border-jeya-cyan bg-jeya-cyan/5 shadow-[0_0_20px_rgba(0,245,255,0.1)]' : 'border-jeya-border hover:border-jeya-cyan/40'
+        }`}>
+        <input ref={inputRef} type="file" className="hidden" onChange={(e) => e.target.files && upload(e.target.files)} />
+        {uploading ? <Loader size={28} className="text-jeya-cyan animate-spin mx-auto" />
+          : <><Upload size={28} className="text-jeya-muted mx-auto mb-3" />
+            <p className="text-jeya-text text-sm font-medium">Faylni shu yerga torting yoki bosing</p>
+            <p className="text-jeya-muted text-xs mt-1">PDF, Word, TXT, rasm</p></>}
+      </div>
+
+      {loading ? <div className="flex justify-center py-12"><Loader className="text-jeya-cyan animate-spin" size={24} /></div>
+        : files.length === 0 ? <Card className="text-center py-12"><Upload size={32} className="text-jeya-muted mx-auto mb-3" /><p className="text-jeya-muted text-sm">Fayllar yo'q</p></Card>
+        : <div className="space-y-3">{files.map((f) => (
+          <Card key={f.id} className="flex items-start gap-4">
+            <FileText size={16} className="text-jeya-cyan mt-0.5 flex-shrink-0" />
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="font-medium text-jeya-text text-sm">{f.filename}</span>
+                <span className={`text-xs px-2 py-0.5 rounded-full border ${
+                  f.analysis_status === 'done' ? 'border-jeya-emerald/30 text-jeya-emerald' :
+                  f.analysis_status === 'error' ? 'border-red-500/30 text-red-400' : 'border-jeya-muted/30 text-jeya-muted'
+                }`}>{f.analysis_status === 'done' ? 'Tahlil tugadi' : f.analysis_status === 'error' ? 'Xato' : 'Kutilmoqda'}</span>
+              </div>
+              <p className="text-jeya-muted text-xs mt-0.5">{fmt(f.file_size)} · {new Date(f.created_at).toLocaleDateString('uz-UZ')}</p>
+              {f.analysis_result && <p className="text-jeya-muted text-xs mt-2 line-clamp-2">{f.analysis_result}</p>}
             </div>
-          </div>
-        )}
-      </div>
-
-      {/* File list */}
-      {loading ? (
-        <div className="flex items-center justify-center py-16">
-          <Loader size={32} className="text-jeya-accent animate-spin" />
-        </div>
-      ) : files.length === 0 ? (
-        <Card className="text-center py-16">
-          <Upload size={48} className="text-jeya-muted mx-auto mb-4" />
-          <h3 className="text-lg font-semibold text-jeya-text mb-2">Fayllar yo'q</h3>
-          <p className="text-jeya-muted text-sm">Birinchi faylingizni yuklang</p>
-        </Card>
-      ) : (
-        <div className="space-y-3">
-          {files.map((file) => {
-            const Icon = getFileIcon(file.file_type)
-            return (
-              <Card key={file.id} className="flex items-start gap-4">
-                <div className="w-10 h-10 rounded-lg bg-jeya-accent/20 flex items-center justify-center flex-shrink-0">
-                  <Icon size={18} className="text-jeya-accent" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-3 flex-wrap">
-                    <span className="font-medium text-jeya-text text-sm truncate">{file.filename}</span>
-                    {statusBadge(file.analysis_status)}
-                  </div>
-                  <div className="text-xs text-jeya-muted mt-1">
-                    {formatSize(file.file_size)} · {new Date(file.created_at).toLocaleDateString('uz-UZ')}
-                  </div>
-                  {file.analysis_result && (
-                    <p className="text-jeya-muted text-xs mt-2 line-clamp-2 leading-relaxed">{file.analysis_result}</p>
-                  )}
-                </div>
-                <div className="flex items-center gap-2 flex-shrink-0">
-                  {file.analysis_status === 'pending' && (
-                    <button
-                      onClick={() => handleAnalyze(file.id)}
-                      disabled={analyzing === file.id}
-                      className="flex items-center gap-1.5 text-jeya-accent hover:text-jeya-accent-glow text-xs px-3 py-1.5 rounded-lg bg-jeya-accent/10 hover:bg-jeya-accent/20 transition-all disabled:opacity-50"
-                    >
-                      {analyzing === file.id ? <Loader size={12} className="animate-spin" /> : <Search size={12} />}
-                      Tahlil
-                    </button>
-                  )}
-                  <button
-                    onClick={() => handleDelete(file.id)}
-                    className="text-jeya-muted hover:text-red-400 p-1.5 rounded-lg hover:bg-red-500/10 transition-all"
-                  >
-                    <Trash2 size={15} />
-                  </button>
-                </div>
-              </Card>
-            )
-          })}
-        </div>
-      )}
+            <div className="flex gap-2">
+              {f.analysis_status === 'pending' && (
+                <button onClick={() => analyze(f.id)} disabled={analyzing === f.id}
+                  className="border border-jeya-cyan/30 text-jeya-cyan text-xs px-3 py-1.5 rounded-lg hover:bg-jeya-cyan/10 flex items-center gap-1 transition-all disabled:opacity-40">
+                  {analyzing === f.id ? <Loader size={11} className="animate-spin" /> : <Search size={11} />} Tahlil
+                </button>
+              )}
+              <button onClick={() => del(f.id)} className="text-jeya-muted hover:text-red-400 p-1.5 rounded hover:bg-red-500/10 transition-all">
+                <Trash2 size={14} />
+              </button>
+            </div>
+          </Card>
+        ))}</div>}
     </div>
   )
 }

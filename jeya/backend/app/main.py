@@ -32,9 +32,4 @@ async def health():
 
 @app.get("/")
 async def root():
-    return {
-        "service": "JEYA API",
-        "version": "1.0.0",
-        "docs": "/docs",
-        "health": "/health",
-    }
+    return {"service": "JEYA API", "version": "1.0.0", "docs": "/docs"}
