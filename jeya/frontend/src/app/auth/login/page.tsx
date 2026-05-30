@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import toast from 'react-hot-toast'
 import { apiClient } from '@/lib/api'
+import { DEMO_MODE, DEMO_USER, DEMO_TOKEN } from '@/lib/demo'
 import { useAuthStore } from '@/store/authStore'
 import Input from '@/components/ui/Input'
 import Button from '@/components/ui/Button'
@@ -24,6 +25,12 @@ export default function LoginPage() {
     else if (!/\S+@\S+\.\S+/.test(form.email)) e.email = "Email noto'g'ri formatda"
     if (!form.password) e.password = "Parol kiritish majburiy"
     return e
+  }
+
+  const handleDemo = () => {
+    login(DEMO_TOKEN, DEMO_USER)
+    toast.success('Demo rejimiga xush kelibsiz!')
+    router.push('/dashboard')
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -95,6 +102,23 @@ export default function LoginPage() {
               Kirish
             </Button>
           </form>
+
+          {DEMO_MODE && (
+            <>
+              <div className="flex items-center gap-3 my-6">
+                <div className="h-px flex-1 bg-jeya-border" />
+                <span className="text-xs text-jeya-muted">yoki</span>
+                <div className="h-px flex-1 bg-jeya-border" />
+              </div>
+              <button
+                type="button"
+                onClick={handleDemo}
+                className="w-full py-3 rounded-lg border border-jeya-cyan/60 text-jeya-cyan font-medium hover:shadow-[0_0_20px_rgba(0,245,255,0.3)] transition-shadow"
+              >
+                🚀 Demo bilan kirish (backendsiz)
+              </button>
+            </>
+          )}
 
           <p className="text-center text-sm text-jeya-muted mt-6">
             Hisobingiz yo'qmi?{' '}

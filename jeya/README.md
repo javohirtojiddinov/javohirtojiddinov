@@ -23,6 +23,22 @@ JEYA — o'zbek tilida ovozli va matnli muloqot qiluvchi, hujjat yarataydigan, f
 - **Anthropic Claude** — AI modeli
 - **OpenAI Whisper** — Ovozdan matn
 
+## Demo rejimi (backendsiz, tezkor sinov)
+
+Platformani **backend, ma'lumotlar bazasi yoki API kalitlarsiz** to'liq sinab ko'rish mumkin.
+Demo rejimida JEYA mock (namunaviy) javoblar bilan ishlaydi.
+
+```bash
+cd frontend
+npm install
+npm run dev
+# Brauzerda: http://localhost:3000
+# Kirish sahifasida "🚀 Demo bilan kirish" tugmasini bosing
+```
+
+Demo rejimi standart holatda yoqilgan (`NEXT_PUBLIC_DEMO_MODE=true`).
+Haqiqiy backend bilan ishlash uchun `.env.local` da `NEXT_PUBLIC_DEMO_MODE=false` qiling.
+
 ## Tez boshlash (Docker)
 
 ```bash

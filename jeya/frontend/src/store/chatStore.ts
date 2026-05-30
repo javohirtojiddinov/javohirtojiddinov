@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { apiClient } from '@/lib/api'
+import { DEMO_MODE, demoReply, DEMO_CONVERSATIONS } from '@/lib/demo'
 
 export interface Message {
   id: string
@@ -44,6 +45,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
   ws: null,
 
   loadConversations: async () => {
+    if (DEMO_MODE) {
+      set((s) => ({ conversations: s.conversations.length ? s.conversations : DEMO_CONVERSATIONS }))
+      return
+    }
     try {
       const res = await apiClient.get('/chat/conversations')
       set({ conversations: res.data })
@@ -54,6 +59,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
   selectConversation: async (id: string) => {
     set({ currentConversationId: id, messages: [] })
+    if (DEMO_MODE) return
     try {
       const res = await apiClient.get(`/chat/conversations/${id}/messages`)
       set({ messages: res.data })
@@ -63,6 +69,16 @@ export const useChatStore = create<ChatState>((set, get) => ({
   },
 
   createConversation: async () => {
+    if (DEMO_MODE) {
+      const conv: Conversation = {
+        id: `demo-${Date.now()}`,
+        title: 'Yangi suhbat',
+        created_at: new Date().toISOString(),
+        message_count: 0,
+      }
+      set((state) => ({ conversations: [conv, ...state.conversations], currentConversationId: conv.id, messages: [] }))
+      return conv.id
+    }
     const res = await apiClient.post('/chat/conversations', { title: 'Yangi suhbat' })
     const conv: Conversation = res.data
     set((state) => ({ conversations: [conv, ...state.conversations], currentConversationId: conv.id, messages: [] }))
@@ -91,6 +107,34 @@ export const useChatStore = create<ChatState>((set, get) => ({
       created_at: new Date().toISOString(),
     }
     set((s) => ({ messages: [...s.messages, assistantMsg] }))
+
+    if (DEMO_MODE) {
+      // So'z-so'z oqim bilan demo javobni imitatsiya qilish
+      const reply = demoReply(content)
+      const words = reply.split(' ')
+      let i = 0
+      await new Promise<void>((resolve) => {
+        const timer = setInterval(() => {
+          if (i >= words.length) {
+            clearInterval(timer)
+            set({ isLoading: false })
+            resolve()
+            return
+          }
+          const chunk = (i === 0 ? '' : ' ') + words[i]
+          set((s) => {
+            const msgs = [...s.messages]
+            const last = msgs[msgs.length - 1]
+            if (last && last.role === 'assistant') {
+              msgs[msgs.length - 1] = { ...last, content: last.content + chunk }
+            }
+            return { messages: msgs }
+          })
+          i++
+        }, 45)
+      })
+      return
+    }
 
     try {
       const token = typeof window !== 'undefined' ? localStorage.getItem('jeya_token') : ''

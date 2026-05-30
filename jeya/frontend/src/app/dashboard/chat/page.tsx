@@ -11,7 +11,7 @@ import toast from 'react-hot-toast'
 function ChatPageInner() {
   const searchParams = useSearchParams()
   const router = useRouter()
-  const convIdParam = searchParams.get('id')
+  const convIdParam = searchParams?.get('id') ?? null
 
   const {
     conversations,
