@@ -1,7 +1,7 @@
 from pydantic import BaseModel
 from datetime import datetime
 from uuid import UUID
-from typing import Optional
+from typing import Optional, List
 
 
 class MessageCreate(BaseModel):
@@ -13,6 +13,7 @@ class MessageResponse(BaseModel):
     role: str
     content: str
     created_at: datetime
+
     model_config = {"from_attributes": True}
 
 
@@ -26,6 +27,7 @@ class ConversationResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
     message_count: Optional[int] = 0
+
     model_config = {"from_attributes": True}
 
 

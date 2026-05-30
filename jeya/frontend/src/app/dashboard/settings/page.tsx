@@ -1,4 +1,5 @@
 'use client'
+
 import { useState } from 'react'
 import { useAuthStore } from '@/store/authStore'
 import { apiClient } from '@/lib/api'
@@ -6,57 +7,117 @@ import toast from 'react-hot-toast'
 import Card from '@/components/ui/Card'
 import Input from '@/components/ui/Input'
 import Button from '@/components/ui/Button'
-import { Settings, User, Lock } from 'lucide-react'
+import { Settings, User, Lock, Bell } from 'lucide-react'
 
 export default function SettingsPage() {
   const { user, setUser } = useAuthStore()
-  const [name, setName] = useState(user?.full_name || '')
-  const [pwd, setPwd] = useState({ current: '', new: '', confirm: '' })
-  const [savingP, setSavingP] = useState(false)
-  const [savingW, setSavingW] = useState(false)
+  const [profile, setProfile] = useState({ full_name: user?.full_name || '', email: user?.email || '' })
+  const [password, setPassword] = useState({ current: '', new: '', confirm: '' })
+  const [savingProfile, setSavingProfile] = useState(false)
+  const [savingPassword, setSavingPassword] = useState(false)
 
-  const saveProfile = async () => {
-    setSavingP(true)
-    try { const r = await apiClient.patch('/auth/me', { full_name: name }); setUser(r.data); toast.success('Saqlandi') }
-    catch { toast.error('Xato') } finally { setSavingP(false) }
+  const handleSaveProfile = async () => {
+    setSavingProfile(true)
+    try {
+      const res = await apiClient.patch('/auth/me', { full_name: profile.full_name })
+      setUser(res.data)
+      toast.success("Profil yangilandi")
+    } catch (e) {
+      toast.error("Profilni saqlashda xato")
+    } finally {
+      setSavingProfile(false)
+    }
   }
 
-  const changePassword = async () => {
-    if (pwd.new !== pwd.confirm) { toast.error('Parollar mos kelmaydi'); return }
-    if (pwd.new.length < 8) { toast.error('Kamida 8 ta belgi'); return }
-    setSavingW(true)
-    try { await apiClient.post('/auth/change-password', { current_password: pwd.current, new_password: pwd.new }); setPwd({ current:'',new:'',confirm:'' }); toast.success("Parol o'zgartirildi") }
-    catch (e: any) { toast.error(e.response?.data?.detail || 'Xato') } finally { setSavingW(false) }
+  const handleChangePassword = async () => {
+    if (password.new !== password.confirm) {
+      toast.error("Yangi parollar mos kelmaydi")
+      return
+    }
+    if (password.new.length < 8) {
+      toast.error("Parol kamida 8 ta belgi bo'lishi kerak")
+      return
+    }
+    setSavingPassword(true)
+    try {
+      await apiClient.post('/auth/change-password', {
+        current_password: password.current,
+        new_password: password.new,
+      })
+      setPassword({ current: '', new: '', confirm: '' })
+      toast.success("Parol o'zgartirildi")
+    } catch (e: any) {
+      toast.error(e.response?.data?.detail || "Parol o'zgartirishda xato")
+    } finally {
+      setSavingPassword(false)
+    }
   }
 
   return (
     <div className="p-8 max-w-2xl">
       <div className="mb-8">
-        <div className="text-xs tracking-[0.3em] text-jeya-cyan mb-1">SOZLAMALAR</div>
-        <h1 className="text-2xl font-black flex items-center gap-3">
-          <Settings size={22} className="text-jeya-cyan" style={{ filter: 'drop-shadow(0 0 6px #00f5ff)' }} />
-          Hisob sozlamalari
+        <h1 className="text-2xl font-bold text-jeya-text flex items-center gap-3">
+          <Settings size={24} className="text-jeya-accent" />
+          Sozlamalar
         </h1>
+        <p className="text-jeya-muted text-sm mt-1">Hisob va xavfsizlik sozlamalari</p>
       </div>
-      <Card className="mb-5">
-        <h2 className="font-bold text-jeya-text mb-4 flex items-center gap-2 text-sm">
-          <User size={15} className="text-jeya-cyan" /> PROFIL
+
+      {/* Profile section */}
+      <Card className="mb-6">
+        <h2 className="text-lg font-semibold text-jeya-text mb-5 flex items-center gap-2">
+          <User size={18} className="text-jeya-accent" />
+          Profil ma'lumotlari
         </h2>
         <div className="space-y-4">
-          <Input label="To'liq ism" value={name} onChange={(e) => setName(e.target.value)} />
-          <Input label="Email" value={user?.email || ''} disabled className="opacity-50" />
-          <Button variant="cyan" isLoading={savingP} onClick={saveProfile}>Saqlash</Button>
+          <Input
+            label="To'liq ism"
+            value={profile.full_name}
+            onChange={(e) => setProfile({ ...profile, full_name: e.target.value })}
+          />
+          <Input
+            label="Email"
+            value={profile.email}
+            disabled
+            className="opacity-60 cursor-not-allowed"
+          />
+          <Button variant="primary" isLoading={savingProfile} onClick={handleSaveProfile}>
+            Saqlash
+          </Button>
         </div>
       </Card>
+
+      {/* Password section */}
       <Card>
-        <h2 className="font-bold text-jeya-text mb-4 flex items-center gap-2 text-sm">
-          <Lock size={15} className="text-jeya-cyan" /> PAROL
+        <h2 className="text-lg font-semibold text-jeya-text mb-5 flex items-center gap-2">
+          <Lock size={18} className="text-jeya-accent" />
+          Parolni o'zgartirish
         </h2>
         <div className="space-y-4">
-          <Input label="Joriy parol" type="password" value={pwd.current} onChange={(e) => setPwd({ ...pwd, current: e.target.value })} />
-          <Input label="Yangi parol" type="password" value={pwd.new} onChange={(e) => setPwd({ ...pwd, new: e.target.value })} />
-          <Input label="Tasdiqlash" type="password" value={pwd.confirm} onChange={(e) => setPwd({ ...pwd, confirm: e.target.value })} />
-          <Button variant="cyan" isLoading={savingW} onClick={changePassword}>O'zgartirish</Button>
+          <Input
+            label="Joriy parol"
+            type="password"
+            value={password.current}
+            onChange={(e) => setPassword({ ...password, current: e.target.value })}
+            placeholder="Joriy parolni kiriting"
+          />
+          <Input
+            label="Yangi parol"
+            type="password"
+            value={password.new}
+            onChange={(e) => setPassword({ ...password, new: e.target.value })}
+            placeholder="Kamida 8 ta belgi"
+          />
+          <Input
+            label="Yangi parolni tasdiqlang"
+            type="password"
+            value={password.confirm}
+            onChange={(e) => setPassword({ ...password, confirm: e.target.value })}
+            placeholder="Parolni qayta kiriting"
+          />
+          <Button variant="primary" isLoading={savingPassword} onClick={handleChangePassword}>
+            Parolni o'zgartirish
+          </Button>
         </div>
       </Card>
     </div>
