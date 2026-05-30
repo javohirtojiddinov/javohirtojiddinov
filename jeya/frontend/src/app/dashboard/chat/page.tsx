@@ -12,6 +12,7 @@ function ChatPageInner() {
   const searchParams = useSearchParams()
   const router = useRouter()
   const convIdParam = searchParams?.get('id') ?? null
+  const qParam = searchParams?.get('q') ?? null
 
   const {
     conversations,
@@ -41,6 +42,16 @@ function ChatPageInner() {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
+
+  // Bosh sahifadan kelgan savolni avtomatik yuborish (?q=...)
+  const sentQ = useRef(false)
+  useEffect(() => {
+    if (qParam && !sentQ.current && !isLoading) {
+      sentQ.current = true
+      sendMessage(qParam)
+      router.replace('/dashboard/chat')
+    }
+  }, [qParam])
 
   const handleSend = async () => {
     const text = input.trim()

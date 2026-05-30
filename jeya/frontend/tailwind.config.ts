@@ -10,13 +10,17 @@ const config: Config = {
     extend: {
       colors: {
         jeya: {
-          dark: '#0a0a0f',
-          card: '#12121a',
-          border: '#1e1e2e',
+          dark: '#04070d',
+          card: '#0a121e',
+          border: '#13314a',
+          cyan: '#00e5ff',
+          'cyan-dim': '#00b8cc',
+          emerald: '#00ff9d',
+          'emerald-dim': '#00cc7a',
           accent: '#6366f1',
           'accent-glow': '#818cf8',
-          text: '#e2e8f0',
-          muted: '#64748b',
+          text: '#dff3ff',
+          muted: '#5f87a6',
         }
       },
       fontFamily: {
@@ -26,6 +30,9 @@ const config: Config = {
         'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
         'float': 'float 6s ease-in-out infinite',
         'glow': 'glow 2s ease-in-out infinite alternate',
+        'spin-slow': 'spin 18s linear infinite',
+        'spin-rev': 'spin-rev 24s linear infinite',
+        'spin-med': 'spin 12s linear infinite',
       },
       keyframes: {
         float: {
@@ -33,9 +40,13 @@ const config: Config = {
           '50%': { transform: 'translateY(-20px)' },
         },
         glow: {
-          '0%': { boxShadow: '0 0 20px #6366f1' },
-          '100%': { boxShadow: '0 0 40px #818cf8, 0 0 80px #6366f166' },
-        }
+          '0%': { boxShadow: '0 0 20px #00e5ff55' },
+          '100%': { boxShadow: '0 0 50px #00ff9d66, 0 0 90px #00e5ff44' },
+        },
+        'spin-rev': {
+          '0%': { transform: 'rotate(360deg)' },
+          '100%': { transform: 'rotate(0deg)' },
+        },
       }
     },
   },
