@@ -1,0 +1,53 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+* { box-sizing: border-box; padding: 0; margin: 0; }
+html, body { max-width: 100vw; overflow-x: hidden; background: #020408; }
+
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: #020408; }
+::-webkit-scrollbar-thumb { background: #00f5ff33; border-radius: 2px; }
+::-webkit-scrollbar-thumb:hover { background: #00f5ff66; }
+
+.glass {
+  background: rgba(8, 15, 24, 0.85);
+  backdrop-filter: blur(16px);
+  border: 1px solid #0d2035;
+}
+
+.glass-cyan {
+  background: rgba(0, 245, 255, 0.03);
+  backdrop-filter: blur(16px);
+  border: 1px solid rgba(0, 245, 255, 0.15);
+}
+
+.neon-text-cyan { color: #00f5ff; text-shadow: 0 0 10px #00f5ff88; }
+.neon-text-emerald { color: #00ff87; text-shadow: 0 0 10px #00ff8788; }
+
+.neon-border-cyan { border-color: #00f5ff44; box-shadow: 0 0 15px #00f5ff22, inset 0 0 15px #00f5ff0a; }
+.neon-border-emerald { border-color: #00ff8744; box-shadow: 0 0 15px #00ff8722; }
+
+.grid-bg {
+  background-image:
+    linear-gradient(rgba(0,245,255,0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0,245,255,0.04) 1px, transparent 1px);
+  background-size: 48px 48px;
+}
+
+.scan-line {
+  position: absolute;
+  left: 0; right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, #00f5ff66, transparent);
+  animation: scan 3s linear infinite;
+}
+
+@keyframes orb-rotate {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+@keyframes orb-rotate-rev {
+  from { transform: rotate(360deg); }
+  to { transform: rotate(0deg); }
+}
